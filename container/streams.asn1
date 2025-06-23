@@ -1,0 +1,47 @@
+MoeVideo DEFINITIONS EXPLICIT TAGS ::= BEGIN
+
+CompressionMode ::= ENUMERATED {
+    none (0),
+    zstd (1),
+    lz4 (2)
+}
+
+ColorMode ::= ENUMERATED {
+                   full (0),
+                   eightbit (1)
+               }
+
+VideoParameters ::= SEQUENCE {
+    width          [0] INTEGER (0..65535),
+    height         [1] INTEGER (0..65535),
+    color          [2] ColorMode
+}
+
+SubtitleParameters ::= SEQUENCE {
+    lang           [0] UTF8String,
+    play-width     [1] INTEGER (0..65535),
+    play-height    [2] INTEGER (0..65535)
+}
+
+CodecParameters ::= CHOICE {
+    subtitle       [0] SubtitleParameters,
+    video          [1] VideoParameters
+}
+
+Stream ::= SEQUENCE {
+    name           [0] UTF8String,
+    index          [1] INTEGER (0..255),
+    duration       [2] INTEGER, -- microseconds
+    extradata      [3] OCTET STRING,
+    compression-mode [4] CompressionMode,
+    compression-dict [5] OCTET STRING OPTIONAL,
+    parameters     [6] CodecParameters
+}
+
+FormatData ::= SEQUENCE {
+    format-name    [0] UTF8String,
+    encoder        [1] UTF8String,
+    tracks         [2] SEQUENCE OF Stream
+}
+
+END

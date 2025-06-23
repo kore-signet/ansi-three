@@ -1,0 +1,3 @@
+[workspace]
+members = ["colorful", "container", "encoder", "img2ansi", "player"]
+resolver = "3"

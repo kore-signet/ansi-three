@@ -1,0 +1,25 @@
+[package]
+name = "colorful"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+argmm = { git = "https://github.com/emily-signet/argmm", version = "0.1.2" }
+image = { version = "0.25.6", default-features = false }
+kasi-kule = { git = "https://github.com/emily-signet/kasi-kule", features = ["sse"] }
+lab = "0.11.0"
+rayon = "1.5.3"
+num_enum = "0.5.7"
+phf = { version = "0.11.3", features = ["macros"] }
+arrayvec = "0.7.2"
+lazy_static = "1.5.0"
+
+[build-dependencies]
+arrayvec = "0.7.2"
+const-gen = { version = "1.6.6", features = ["phf"] }
+kasi-kule = { git = "https://github.com/emily-signet/kasi-kule" }
+lab = "0.11.0"
+prettypretty = "0.11.1"
+prettytty = "0.2.2"
