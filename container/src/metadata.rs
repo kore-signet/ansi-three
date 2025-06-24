@@ -19,6 +19,13 @@ impl CodecParameters {
         }
     }
 
+    pub fn is_subtitle(&self) -> bool {
+        match self {
+            CodecParameters::Subtitle(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn as_video(&self) -> Option<&VideoParameters> {
         match self {
             CodecParameters::Video(video_parameters) => Some(video_parameters),

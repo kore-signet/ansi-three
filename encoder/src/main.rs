@@ -16,7 +16,6 @@ use container::{
     EncodableData, FormatDuration, Packet,
     metadata::{ColorMode, CompressionMode, SubtitleParameters, VideoParameters},
 };
-use encoder::{encoders::lz4::Lz4Compressor, ff::decoder::FFDecoder};
 use encoder::{
     encoders::{
         Pipeline, SeekTableEncoder,
@@ -24,6 +23,10 @@ use encoder::{
         video::{AnsiVideoEncoder, DitherMethod},
     },
     ff::{self},
+};
+use encoder::{
+    encoders::{lz4::Lz4Compressor, zstd::ZstdCompressor},
+    ff::decoder::FFDecoder,
 };
 use litemap::LiteMap;
 use rasn::types::OctetString;
@@ -148,7 +151,7 @@ fn main() -> anyhow::Result<()> {
             height: cli.height as u16,
             color: cli.color_mode,
         }),
-        compression_mode: CompressionMode::None,
+        compression_mode: CompressionMode::Zstd,
     });
 
     ansi_encoder.add_encoder(
@@ -160,7 +163,8 @@ fn main() -> anyhow::Result<()> {
             multiplier: cli.multiplier,
             width: cli.width,
             height: cli.height,
-        }), // .with_step(ZstdCompressor::with_dict(3, dict)?),
+        })
+        .with_step(ZstdCompressor::new(8)?), // .with_step(ZstdCompressor::with_dict(3, dict)?),
     );
 
     for subtitle_track in ff_decoder.subs.values() {

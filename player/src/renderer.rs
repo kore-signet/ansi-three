@@ -12,7 +12,7 @@ use spin_sleep::SpinSleeper;
 use stable_vec::StableVec;
 use std::{
     io::{self, IoSlice, Read, Seek, Write},
-    sync::Arc,
+    sync::{Arc, atomic::AtomicU8},
     thread::JoinHandle,
     time::{Duration, Instant},
 };
@@ -24,7 +24,7 @@ pub struct PlayerControl<R: Read + Seek + Send + 'static> {
     pub state: RendererState,
     pause_time: Option<Instant>,
 
-    header: FormatData,
+    pub header: FormatData,
     pub video_stream: Stream,
 
     reader_handle: Arc<Mutex<Reader<R, states::SeektablesRead>>>,
@@ -51,6 +51,7 @@ pub struct RendererState {
     pub play_status: Arc<(Mutex<PlayThreadState>, Condvar)>,
     pub current_time: Arc<Mutex<Instant>>,
     pub video_time: Arc<Mutex<Duration>>,
+    pub subtitle_index: Arc<AtomicU8>,
 }
 
 impl Clone for RendererState {
@@ -59,6 +60,7 @@ impl Clone for RendererState {
             play_status: Arc::clone(&self.play_status),
             current_time: Arc::clone(&self.current_time),
             video_time: Arc::clone(&self.video_time),
+            subtitle_index: Arc::clone(&self.subtitle_index),
         }
     }
 }
@@ -97,6 +99,7 @@ impl<R: Read + Seek + Send + 'static> PlayerControl<R> {
             play_status: Default::default(),
             current_time: Arc::new(Mutex::new(Instant::now())),
             video_time: Default::default(),
+            subtitle_index: Arc::new(AtomicU8::new(255)),
         };
 
         let pause_time = Some(Instant::now());
@@ -122,6 +125,23 @@ impl<R: Read + Seek + Send + 'static> PlayerControl<R> {
             reader_thread,
             render_thread,
         })
+    }
+
+    pub fn auto_select_subtitles(&self) {
+        for stream in &self.header.tracks {
+            if stream.parameters.is_subtitle() {
+                self.state
+                    .subtitle_index
+                    .store(stream.index, std::sync::atomic::Ordering::Release);
+                break;
+            }
+        }
+    }
+
+    pub fn select_subtitles(&self, index: u8) {
+        self.state
+            .subtitle_index
+            .store(index, std::sync::atomic::Ordering::Release);
     }
 
     pub fn seek(&mut self, time: Duration) -> io::Result<()> {
@@ -224,6 +244,7 @@ impl<R: Read + Seek + Send + 'static> PlayerControl<R> {
 // }
 
 struct Subtitle {
+    stream: u8,
     starts_at: Duration,
     ends_at: Duration,
     subtitle: String,
@@ -235,6 +256,9 @@ fn render_loop(
     receiver: Receiver<PacketWithData, WithCapacity>,
     state: RendererState,
 ) {
+    output.write_all(b"\x1b[1;1H\x1b[?25l").unwrap();
+    output.flush().unwrap();
+
     let sleeper = SpinSleeper::default();
     let mut subs: StableVec<Subtitle> = StableVec::with_capacity(8);
 
@@ -261,6 +285,7 @@ fn render_loop(
 
                     for sub in new_subs {
                         subs.push(Subtitle {
+                            stream: slot.header.stream,
                             subtitle: sub.to_string(),
                             starts_at: slot.header.timestamp,
                             ends_at: slot.header.timestamp + slot.header.duration,
@@ -286,6 +311,7 @@ fn render_loop(
 
             for sub in new_subs {
                 subs.push(Subtitle {
+                    stream: slot.header.stream,
                     subtitle: sub.to_string(),
                     starts_at: slot.header.timestamp,
                     ends_at: slot.header.timestamp + slot.header.duration,
@@ -329,11 +355,17 @@ fn render_loop(
             &Subtitle {
                 ref subtitle,
                 starts_at,
+                stream,
                 ..
             },
         ) in &subs
         {
-            if starts_at > slot.header.timestamp + slot.header.duration {
+            if starts_at > slot.header.timestamp + slot.header.duration
+                || stream
+                    != state
+                        .subtitle_index
+                        .load(std::sync::atomic::Ordering::Acquire)
+            {
                 continue;
             }
 

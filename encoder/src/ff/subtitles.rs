@@ -15,7 +15,7 @@ pub trait SubtitleDecoder {
     fn decode_subtitle(&mut self, sub: &FFSubFrame) -> Vec<SubRect>;
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 enum AlignX {
     Left,
     Centre,
@@ -41,6 +41,7 @@ pub struct ASSDecoder {
     styles: HashMap<String, StyleInfo>, // l, r, v
 }
 
+#[derive(Debug)]
 pub struct StyleInfo {
     margin_left: i64,
     margin_right: i64,
@@ -166,7 +167,7 @@ impl SubtitleDecoder for ASSDecoder {
 
 impl ASSDecoder {
     fn render_event(&self, event: &EventLine<'_>) -> Vec<SubRect> {
-        let style = self.styles.get(event.style.as_ref()).unwrap();
+        let style: &StyleInfo = self.styles.get(event.style.as_ref()).unwrap();
 
         let margin_left = if event.margin_left == 0 {
             style.margin_left
@@ -191,7 +192,7 @@ impl ASSDecoder {
             AlignY::Top => margin_vert,
         };
 
-        let max_space = 192 - (margin_left + margin_right);
+        let max_space = self.target_res_x - (margin_left + margin_right);
         let lines = textwrap::wrap(&event.text, max_space as usize);
 
         let origin_x = margin_left;

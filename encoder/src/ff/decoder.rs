@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use ffmpeg::format::context::common::StreamIter;
 use ffmpeg::format::{Pixel, input as ff_input};
+use ffmpeg_the_third::codec::Id as CodecID;
 use ffmpeg_the_third::codec::context::Context as CodecContext;
 use ffmpeg_the_third::codec::decoder::Video as VideoDecoder;
 use ffmpeg_the_third::codec::decoder::subtitle::Subtitle as FFSubtitleDecoder;
@@ -222,7 +223,10 @@ impl FFDecoder {
 
         let subs = input_ctx
             .streams()
-            .filter(|s| s.parameters().medium() == ffmpeg::media::Type::Subtitle)
+            .filter(|s| {
+                s.parameters().medium() == ffmpeg::media::Type::Subtitle
+                    && [CodecID::ASS, CodecID::SSA].contains(&s.parameters().id())
+            })
             .filter_map(|s| SubtitleProcessor::from_stream(s, target_x, target_y).ok())
             .map(|s| (s.sub_index, s))
             .collect();

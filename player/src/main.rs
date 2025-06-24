@@ -1,11 +1,16 @@
-use container::{EncodableData, FormatDuration, PacketDataType, SubRect, SubRectVec};
+use clap::Parser;
+use container::{
+    EncodableData, FormatDuration, PacketDataType, SubRect, SubRectVec, metadata::Stream,
+};
 use crossterm::{
     event::{
-        EnableBracketedPaste, EnableFocusChange, EnableMouseCapture, Event, KeyCode,
-        KeyboardEnhancementFlags, MouseButton, MouseEventKind, PushKeyboardEnhancementFlags, read,
+        DisableBracketedPaste, DisableFocusChange, DisableMouseCapture, EnableBracketedPaste,
+        EnableFocusChange, EnableMouseCapture, Event, KeyCode, KeyboardEnhancementFlags,
+        MouseButton, MouseEventKind, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+        read,
     },
     execute, queue,
-    terminal::{Clear, enable_raw_mode},
+    terminal::{Clear, disable_raw_mode, enable_raw_mode},
 };
 use player::{PacketWithData, Reader, renderer::PlayerControl};
 use spin_sleep::SpinSleeper;
@@ -13,12 +18,22 @@ use stable_vec::StableVec;
 use std::{
     fs::File,
     io::{self, BufReader, BufWriter, IoSlice, Write},
+    path::PathBuf,
     time::{Duration, Instant},
 };
 use termion::{event::Key, input::TermRead, raw::IntoRawMode};
 use thingbuf::{mpsc::blocking as mpsc, recycling::WithCapacity};
 
+#[derive(clap::Parser)]
+struct PlayArgs {
+    file: PathBuf,
+    #[arg(long)]
+    subtitle_index: Option<u8>,
+}
+
 fn main() -> anyhow::Result<()> {
+    let cli = PlayArgs::parse();
+
     enable_raw_mode()?;
 
     let mut stdout = io::stdout();
@@ -50,12 +65,18 @@ fn main() -> anyhow::Result<()> {
     stdout.flush()?;
 
     let mut stdout = BufWriter::with_capacity(192 * 108 * 20, stdout);
-    stdout.write_all(b"\x1b[1;1H\x1b[?25l")?;
-    stdout.flush()?;
 
-    let mut renderer = PlayerControl::new(BufReader::new(File::open("out.ansi")?), stdout)?;
+    let mut renderer = PlayerControl::new(BufReader::new(File::open(cli.file)?), stdout)?;
     let video_track = renderer.video_stream.clone();
     let video_params = video_track.parameters.as_video().unwrap().clone();
+
+    if let Some(idx) = cli.subtitle_index {
+        renderer.select_subtitles(idx);
+    } else {
+        // let mut subtitle_options: Vec<&Stream> = renderer.header.tracks.iter().filter(|s| s.parameters.is_subtitle()).collect();
+        // writeln!(io::stdout(), "select subti")
+        renderer.auto_select_subtitles();
+    }
 
     renderer.resume();
 
@@ -70,7 +91,18 @@ fn main() -> anyhow::Result<()> {
                     KeyCode::Char('d') => renderer.seek_forward(Duration::from_secs(5))?,
                     KeyCode::Char('r') => renderer.resume(),
                     KeyCode::Char('p') => renderer.pause(),
-                    KeyCode::Char('q') => panic!("bye!"),
+                    KeyCode::Char('q') => {
+                        execute!(
+                            io::stdout(),
+                            PopKeyboardEnhancementFlags,
+                            DisableBracketedPaste,
+                            DisableFocusChange,
+                            DisableMouseCapture,
+                            Clear(crossterm::terminal::ClearType::All)
+                        )?;
+                        disable_raw_mode();
+                        panic!("bye!")
+                    }
                     _ => continue,
                 };
             }
