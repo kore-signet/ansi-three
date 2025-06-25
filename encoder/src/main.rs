@@ -11,7 +11,7 @@ use clap::{
     Parser,
     builder::{PossibleValuesParser, TypedValueParser},
 };
-use colorful::pattern_dithering::MatrixSize;
+use colorful::{bluenoise::Bluenoise, pattern_dithering::MatrixSize};
 use container::{
     EncodableData, FormatDuration, Packet,
     metadata::{ColorMode, CompressionMode, SubtitleParameters, VideoParameters},
@@ -57,6 +57,10 @@ pub struct EncoderArgs {
     video_dict: Option<PathBuf>,
     #[arg(long, default_value_t = CompressionMode::Lz4, value_parser = PossibleValuesParser::new(["none", "zstd", "lz4"]).try_map(|v| CompressionMode::from_str(&v)))]
     compression_mode: CompressionMode,
+    #[arg(long)]
+    noise_map: Option<PathBuf>,
+    #[arg(long, default_value_t = 64.00f64)]
+    noise_range: f64,
 }
 
 #[allow(dead_code)]
@@ -154,6 +158,13 @@ fn main() -> anyhow::Result<()> {
         compression_mode: CompressionMode::Zstd,
     });
 
+    let blue_noise = if let Some(noise_path) = cli.noise_map.as_ref() {
+        let noise = image::open(noise_path).unwrap().into_luma8();
+        Some(Bluenoise::new(noise, cli.noise_range))
+    } else {
+        None
+    };
+
     ansi_encoder.add_encoder(
         ff_decoder.video_stream_idx() as u8,
         Pipeline::new(AnsiVideoEncoder {
@@ -163,6 +174,7 @@ fn main() -> anyhow::Result<()> {
             multiplier: cli.multiplier,
             width: cli.width,
             height: cli.height,
+            blue_noise,
         })
         .with_step(ZstdCompressor::new(8)?), // .with_step(ZstdCompressor::with_dict(3, dict)?),
     );

@@ -17,7 +17,7 @@ ffmpeg-the-third = { git = "https://github.com/kore-signet/ffmpeg-the-third", fe
 ] }
 thingbuf = "0.1.6"
 container = { path = "../container" }
-image = { version = "0.25.6", default-features = false }
+image = { version = "0.25.6", default-features = false, features = ["png"] }
 img2ansi = { path = "../img2ansi" }
 colorful = { path = "../colorful" }
 bytes = "1.10.1"

@@ -1,7 +1,6 @@
 use container::{
     EncodableData, PacketDataType, SubRect, SubRectVec,
     metadata::{FormatData, Stream},
-    seek::SeekEntry,
 };
 use crossterm::{
     execute,
@@ -33,18 +32,13 @@ pub struct PlayerControl<R: Read + Seek + Send + 'static> {
     render_thread: JoinHandle<()>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum PlayThreadState {
     Playing,
+    #[default]
     Paused,
     DiscardRequest,
     DiscardDone,
-}
-
-impl Default for PlayThreadState {
-    fn default() -> Self {
-        PlayThreadState::Paused
-    }
 }
 
 pub struct RendererState {
@@ -66,10 +60,7 @@ impl Clone for RendererState {
 }
 
 impl<R: Read + Seek + Send + 'static> PlayerControl<R> {
-    pub fn new(
-        input: R,
-        mut output: impl Write + Send + 'static,
-    ) -> anyhow::Result<PlayerControl<R>> {
+    pub fn new(input: R, output: impl Write + Send + 'static) -> anyhow::Result<PlayerControl<R>> {
         let input = Reader::new(input);
         let (input, header) = input.read_header()?;
         let (input, seektables) = input.read_seektables()?;
@@ -163,7 +154,7 @@ impl<R: Read + Seek + Send + 'static> PlayerControl<R> {
         if delta >= 0 {
             *current_time += Duration::from_micros(delta as u64);
         } else {
-            *current_time -= Duration::from_micros(delta.abs() as u64);
+            *current_time -= Duration::from_micros(delta.unsigned_abs());
         }
 
         self.wait_for_state(|v| *v != PlayThreadState::DiscardDone);
@@ -198,8 +189,8 @@ impl<R: Read + Seek + Send + 'static> PlayerControl<R> {
     }
 
     fn wait_for_state(&self, mut keep_waiting: impl FnMut(&mut PlayThreadState) -> bool) {
-        let &(ref lock, ref cvar) = &*self.state.play_status;
-        if !keep_waiting(&mut *lock.lock()) {
+        let (lock, cvar) = &*self.state.play_status;
+        if !keep_waiting(&mut lock.lock()) {
             return;
         }
 
@@ -231,7 +222,7 @@ impl<R: Read + Seek + Send + 'static> PlayerControl<R> {
         self.state.play_status.1.notify_all();
     }
 
-    pub fn join(mut self) {
+    pub fn join(self) {
         self.reader_thread.join();
         self.render_thread.join();
     }
@@ -267,7 +258,7 @@ fn render_loop(
 
     'play: loop {
         // wait for play status to shift to true
-        let &(ref lock, ref cvar) = &*state.play_status;
+        let (lock, cvar) = &*state.play_status;
         let mut playing = lock.lock();
         cvar.wait_while(&mut playing, |v| {
             *v == PlayThreadState::Paused || *v == PlayThreadState::DiscardDone

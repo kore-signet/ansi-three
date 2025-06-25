@@ -24,3 +24,5 @@ target
 *.ansi
 *.ssa
 *.mp4
+sources/
+samples/

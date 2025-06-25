@@ -15,6 +15,8 @@ num_enum = "0.5.7"
 phf = { version = "0.11.3", features = ["macros"] }
 arrayvec = "0.7.2"
 lazy_static = "1.5.0"
+bluenoise = "0.2.1"
+rand = "0.9.1"
 
 [build-dependencies]
 arrayvec = "0.7.2"

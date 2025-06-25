@@ -93,11 +93,11 @@ impl<R: Read + Seek> Reader<R, states::Start> {
             match stream.compression_mode {
                 CompressionMode::None => continue,
                 CompressionMode::Zstd => self.decoders.insert(
-                    stream.index as u8,
+                    stream.index,
                     Box::new(ZstdDecoder::new(stream.compression_dict.as_ref())?),
                 ),
                 CompressionMode::Lz4 => self.decoders.insert(
-                    stream.index as u8,
+                    stream.index,
                     Box::new(Lz4Decoder::new(stream.compression_dict.as_ref())),
                 ),
             };

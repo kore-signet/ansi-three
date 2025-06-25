@@ -42,7 +42,7 @@ impl DecoderProcessor for Lz4Decoder {
             Some(dict) => decompress_into_with_dict(data, &mut self.scratch, dict),
             None => decompress_into(data, &mut self.scratch),
         }
-        .map_err(|e| io::Error::other(e))?;
+        .map_err(io::Error::other)?;
 
         data.clear();
         data.append(&mut self.scratch);

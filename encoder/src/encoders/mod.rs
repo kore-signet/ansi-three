@@ -1,5 +1,3 @@
-use std::io::{self, Read, Write};
-
 use crate::ff::packet::FFPacket;
 use arrayvec::ArrayVec;
 use byteorder::{LittleEndian, WriteBytesExt};

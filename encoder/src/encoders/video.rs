@@ -1,5 +1,6 @@
 use clap::ValueEnum;
 use colorful::{
+    bluenoise::Bluenoise,
     palette::{AnsiColorMap, CAM02},
     pattern_dithering::{MatrixSize, PatternDither},
 };
@@ -13,6 +14,8 @@ use crate::{encoders::FFToAnsi, ff::packet::FFPacket};
 pub enum DitherMethod {
     FloydSteinberg,
     Pattern,
+    BlueNoise,
+    None,
 }
 
 pub struct AnsiVideoEncoder {
@@ -22,6 +25,7 @@ pub struct AnsiVideoEncoder {
     pub multiplier: f32,
     pub width: i64,
     pub height: i64,
+    pub blue_noise: Option<Bluenoise>,
 }
 
 impl FFToAnsi for AnsiVideoEncoder {
@@ -47,6 +51,8 @@ impl FFToAnsi for AnsiVideoEncoder {
             ColorMode::EightBit => match self.dither_mode {
                 DitherMethod::FloydSteinberg => self.floyd_steinberg(image, data)?,
                 DitherMethod::Pattern => self.pattern_dither(image, data)?,
+                DitherMethod::None => self.index_image(image, data)?,
+                DitherMethod::BlueNoise => self.blue_noise(image, data)?,
             },
         };
 
@@ -91,6 +97,34 @@ impl AnsiVideoEncoder {
         );
 
         AnsiFrame::from(indexed).encode_into(data)?;
+
+        Ok(())
+    }
+
+    fn blue_noise(
+        &mut self,
+        in_image: ImageBuffer<Rgb<u8>, &[u8]>,
+        data: &mut Vec<u8>,
+    ) -> std::io::Result<()> {
+        let indexed = self.blue_noise.as_ref().unwrap().dither(&in_image);
+
+        AnsiFrame::from(indexed).encode_into(data)?;
+
+        Ok(())
+    }
+
+    fn index_image(
+        &mut self,
+        in_image: ImageBuffer<Rgb<u8>, &[u8]>,
+        data: &mut Vec<u8>,
+    ) -> std::io::Result<()> {
+        let base_image =
+            ImageBuffer::from_vec(self.width as u32, self.height as u32, in_image.to_vec())
+                .unwrap();
+
+        let indexed_image =
+            imageops::index_colors(&base_image, &const { AnsiColorMap::<CAM02>::new() });
+        AnsiFrame::from(indexed_image).encode_into(data)?;
 
         Ok(())
     }

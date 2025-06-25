@@ -1,7 +1,4 @@
 use clap::Parser;
-use container::{
-    EncodableData, FormatDuration, PacketDataType, SubRect, SubRectVec, metadata::Stream,
-};
 use crossterm::{
     event::{
         DisableBracketedPaste, DisableFocusChange, DisableMouseCapture, EnableBracketedPaste,
@@ -12,17 +9,13 @@ use crossterm::{
     execute, queue,
     terminal::{Clear, disable_raw_mode, enable_raw_mode},
 };
-use player::{PacketWithData, Reader, renderer::PlayerControl};
-use spin_sleep::SpinSleeper;
-use stable_vec::StableVec;
+use player::renderer::PlayerControl;
 use std::{
     fs::File,
-    io::{self, BufReader, BufWriter, IoSlice, Write},
+    io::{self, BufReader, BufWriter, Write},
     path::PathBuf,
-    time::{Duration, Instant},
+    time::Duration,
 };
-use termion::{event::Key, input::TermRead, raw::IntoRawMode};
-use thingbuf::{mpsc::blocking as mpsc, recycling::WithCapacity};
 
 #[derive(clap::Parser)]
 struct PlayArgs {
@@ -64,7 +57,7 @@ fn main() -> anyhow::Result<()> {
 
     stdout.flush()?;
 
-    let mut stdout = BufWriter::with_capacity(192 * 108 * 20, stdout);
+    let stdout = BufWriter::with_capacity(192 * 108 * 20, stdout);
 
     let mut renderer = PlayerControl::new(BufReader::new(File::open(cli.file)?), stdout)?;
     let video_track = renderer.video_stream.clone();
